@@ -10,7 +10,7 @@ def search():
     response = requests.get(f'https://duckduckgo.com/?q={query}')
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    # Example: extract the title of the search results
+    # Example: extract titles or any other relevant content
     titles = [tag.get_text() for tag in soup.find_all('a', {'class': 'result__a'})]
     
     return render_template_string("""
