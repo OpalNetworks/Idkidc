@@ -6,67 +6,71 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 
-namespace WebProxy
+public class Startup
 {
-    public class Startup
+    public void ConfigureServices(IServiceCollection services)
     {
-        public void ConfigureServices(IServiceCollection services)
+        services.AddControllersWithViews();
+        services.AddHttpClient();
+    }
+
+    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+    {
+        if (env.IsDevelopment())
         {
-            services.AddControllersWithViews();
+            app.UseDeveloperExceptionPage();
+        }
+        else
+        {
+            app.UseExceptionHandler("/Home/Error");
+            app.UseHsts();
         }
 
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        app.UseHttpsRedirection();
+        app.UseStaticFiles();
+
+        app.UseRouting();
+
+        app.UseAuthorization();
+
+        app.UseEndpoints(endpoints =>
         {
-            if (env.IsDevelopment())
+            endpoints.MapControllerRoute(
+                name: "default",
+                pattern: "{controller=Home}/{action=Index}/{id?}");
+
+            endpoints.MapGet("/", async context =>
             {
-                app.UseDeveloperExceptionPage();
+                await context.Response.SendFileAsync("wwwroot/index.html");
+            });
+
+            endpoints.MapPost("/search", async context =>
+            {
+                var query = context.Request.Form["query"].ToString();
+                var searchResult = await ProxySearchRequest(query);
+
+                // Return the search results directly as HTML content
+                context.Response.ContentType = "text/html";
+                await context.Response.WriteAsync(searchResult);
+            });
+        });
+    }
+
+    private async Task<string> ProxySearchRequest(string query)
+    {
+        using (HttpClient client = new HttpClient())
+        {
+            // Perform a GET request to Google
+            var response = await client.GetAsync($"https://www.google.com/search?q={System.Net.WebUtility.UrlEncode(query)}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Return the search results page as HTML
+                return await response.Content.ReadAsStringAsync();
             }
             else
             {
-                app.UseExceptionHandler("/Home/Error");
-                app.UseHsts();
-            }
-
-            app.UseHttpsRedirection();
-            app.UseStaticFiles();
-
-            app.UseRouting();
-
-            app.UseEndpoints(endpoints =>
-            {
-                endpoints.MapGet("/", async context =>
-                {
-                    await context.Response.SendFileAsync("wwwroot/index.html");
-                });
-
-                endpoints.MapPost("/search", async context =>
-                {
-                    var query = context.Request.Form["query"].ToString();
-                    var searchResult = await ProxySearchRequest(query);
-
-                    // Return the search results directly as HTML content
-                    context.Response.ContentType = "text/html";
-                    await context.Response.WriteAsync(searchResult);
-                });
-            });
-        }
-
-        private async Task<string> ProxySearchRequest(string query)
-        {
-            using (HttpClient client = new HttpClient())
-            {
-                // Perform a GET request to a search engine (like Bing or Google)
-                var response = await client.GetAsync($"https://www.bing.com/search?q={System.Net.WebUtility.UrlEncode(query)}");
-
-                if (response.IsSuccessStatusCode)
-                {
-                    // Return the search results page as HTML
-                    return await response.Content.ReadAsStringAsync();
-                }
-                else
-                {
-                    return "<h1>Error fetching search results</h1>";
-                }
+                return "<h1>Error fetching search results</h1>";
             }
         }
     }
